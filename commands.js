@@ -1,8 +1,16 @@
 import { QueryType } from "discord-player";
-import { EmbedBuilder, REST, Routes, SlashCommandBuilder } from "discord.js";
+import {
+  AttachmentBuilder,
+  EmbedBuilder,
+  REST,
+  Routes,
+  SlashCommandBuilder,
+} from "discord.js";
 import * as dotenv from "dotenv";
 
 dotenv.config();
+
+const file = new AttachmentBuilder("./assets/thumbnail.gif");
 
 const commandsList = [
   {
@@ -31,11 +39,11 @@ const commandsList = [
               .setRequired(true)
           )
       ),
-    run: async ({ client, interaction }) => {
+    async run({ client, interaction }) {
       let url = null;
       let searchEngine = null;
 
-      switch (interaction.options.getSubcommand()) {
+      switch (await interaction.options.getSubcommand()) {
         case "url":
           url = interaction.options.getString("url");
           searchEngine = QueryType.YOUTUBE_VIDEO;
@@ -52,34 +60,182 @@ const commandsList = [
       });
 
       if (result.tracks.length === 0) {
-        return interaction.reply("Não foi encontrado o vídeo");
+        throw {
+          message: "Não foi encontrado o vídeo",
+        };
       }
 
       const song = result.tracks[0];
 
       const queue = await client.player.createQueue(interaction.guild);
 
-      if (interaction.member.voice.channel && !queue.connection) {
+      if (!interaction.member.voice.channel) {
+        throw {
+          message:
+            "Você precisa estar em um Voice Channel para usar este comando",
+        };
+      }
+
+      if (!queue.connection) {
         await queue.connect(interaction.member.voice.channel);
-      } else {
-        return interaction.reply(
-          "Você precisa estar em um Voice Channel para usar este comando"
-        );
       }
 
       await queue.addTrack(song);
 
       const embed = new EmbedBuilder()
-        .setDescription(
-          `**[${song.title}](${song.url})** foi adicionado à fila`
+        .setAuthor({ name: song.source.toUpperCase() })
+        .setTitle(song.title)
+        .setURL(song.url)
+        .setDescription(`Foi adicionado à fila`)
+        .addFields(
+          { name: "Nome do Canal", value: song.author, inline: true },
+          { name: "Duração", value: song.duration, inline: true }
         )
         .setThumbnail(song.thumbnail)
-        .setFooter({ text: `Duração: ${song.duration}` });
+        .setImage("attachment://thumbnail.gif")
+        .setTimestamp();
 
       if (!queue.playing) queue.play();
 
       await interaction.reply({
         embeds: [embed],
+        files: [file],
+      });
+    },
+  },
+  {
+    data: new SlashCommandBuilder()
+      .setName("pause")
+      .setDescription("Pausar a música"),
+    async run({ client, interaction }) {
+      const queue = client.player.getQueue(interaction.guildId);
+
+      if (!queue) {
+        throw {
+          message: "Não há músicas na fila",
+        };
+      }
+
+      queue.setPaused(true);
+
+      await interaction.reply("O som foi pausado.");
+    },
+  },
+  {
+    data: new SlashCommandBuilder()
+      .setName("resume")
+      .setDescription("Retoma a música"),
+    async run({ client, interaction }) {
+      const queue = client.player.getQueue(interaction.guildId);
+
+      if (!queue) {
+        throw {
+          message: "Não há músicas na fila",
+        };
+      }
+
+      queue.setPaused(false);
+
+      await interaction.reply("O som foi retomado.");
+    },
+  },
+  {
+    data: new SlashCommandBuilder()
+      .setName("skip")
+      .setDescription("Ir para o próximo som"),
+    async run({ client, interaction }) {
+      const queue = await client.player.getQueue(interaction.guildId);
+
+      if (!queue) {
+        throw {
+          message: "Não há músicas na fila",
+        };
+      }
+
+      const nextSong = queue.tracks[0];
+
+      queue.skip();
+
+      if (nextSong) {
+        await interaction.reply({
+          embeds: [
+            new EmbedBuilder()
+              .setTitle("Pulando...")
+              .setDescription(
+                `O próximo som será [${nextSong.title}](${nextSong.url})`
+              )
+              .setThumbnail(nextSong.thumbnail),
+          ],
+        });
+      }
+    },
+  },
+  {
+    data: new SlashCommandBuilder()
+      .setName("info")
+      .setDescription(
+        "Exibe informações sobre os sons que está tocando no momento"
+      ),
+    async run({ client, interaction }) {
+      const queue = client.player.getQueue(interaction.guildId);
+
+      if (!queue) {
+        throw {
+          message: "Não há músicas na fila",
+        };
+      }
+
+      let bar = queue.createProgressBar({
+        queue: false,
+        length: 19,
+      });
+
+      let embeds = [];
+
+      if (queue.tracks.length != 0) {
+        embeds = queue.tracks
+          .map((song, index) => {
+            return new EmbedBuilder().setDescription(
+              `${index + 1}. [${song.title}](${song.url})`
+            );
+          })
+          .reverse();
+      }
+
+      const currentSong = queue.current;
+
+      embeds.push(
+        new EmbedBuilder()
+          .setThumbnail(currentSong.thumbnail)
+          .setDescription(
+            `Currently Playing [${currentSong.title}](${currentSong.url})\n\n` +
+              bar
+          )
+      );
+
+      await interaction.reply({
+        embeds: embeds,
+      });
+    },
+  },
+  {
+    data: new SlashCommandBuilder()
+      .setName("stop")
+      .setDescription("Parar o bot e limpar a fila"),
+    async run({ client, interaction }) {
+      const queue = client.player.getQueue(interaction.guildId);
+
+      if (!queue) {
+        throw {
+          message: "Não há músicas na fila",
+        };
+      }
+
+      queue.destroy();
+      await interaction.reply({
+        embeds: [
+          new EmbedBuilder().setTitle("Parando...").setDescription(`Até mais!`),
+        ],
       });
     },
   },

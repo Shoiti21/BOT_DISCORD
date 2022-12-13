@@ -23,16 +23,22 @@ client.on("ready", () => {
 });
 
 client.on(Events.InteractionCreate, async (interaction) => {
-  if (!interaction.isChatInputCommand()) return;
+  if (
+    !interaction.isChatInputCommand ||
+    interaction.isButton() ||
+    interaction.isModalSubmit()
+  )
+    return;
+
   try {
     const command = interaction.client.commands.get(interaction.commandName);
     if (!command) {
-      throw { mensange: "Comando não configurado" };
+      throw { message: "Comando não configurado" };
     }
     await command.run({ client, interaction });
   } catch (error) {
     await interaction.reply({
-      content: error.mensange || "Aconteceu algo",
+      content: error.message || "Aconteceu algo",
       ephemeral: true,
     });
   }
