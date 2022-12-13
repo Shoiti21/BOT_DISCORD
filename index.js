@@ -1,11 +1,20 @@
 import * as dotenv from "dotenv";
 import { Client, Collection, Events, GatewayIntentBits } from "discord.js";
 import commands from "./commands.js";
+import { Player } from "discord-player";
 
 dotenv.config();
 
-const client = new Client({ intents: [GatewayIntentBits.Guilds] });
+const client = new Client({
+  intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildVoiceStates],
+});
 client.commands = new Collection();
+client.player = new Player(client, {
+  ytdlOptions: {
+    quality: "highestaudio",
+    highWaterMark: 1 << 25,
+  },
+});
 
 commands(client);
 
@@ -20,10 +29,10 @@ client.on(Events.InteractionCreate, async (interaction) => {
     if (!command) {
       throw { mensange: "Comando não configurado" };
     }
-    await command.execute(interaction);
+    await command.run({ client, interaction });
   } catch (error) {
     await interaction.reply({
-      content: error.mensange,
+      content: error.mensange || "Aconteceu algo",
       ephemeral: true,
     });
   }
