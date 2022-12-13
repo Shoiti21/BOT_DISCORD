@@ -1,32 +1,32 @@
-import express from "express";
 import * as dotenv from "dotenv";
-import { verifyKeyMiddleware } from "discord-interactions";
+import { Client, Collection, Events, GatewayIntentBits } from "discord.js";
+import commands from "./commands.js";
 
 dotenv.config();
 
-const app = express();
+const client = new Client({ intents: [GatewayIntentBits.Guilds] });
+client.commands = new Collection();
 
-app.listen(process.env.PORT, () => {
-  console.log(`Conectado na porta ${process.env.PORT}`);
+commands(client);
+
+client.on("ready", () => {
+  console.log(`Conectado no ${client.user.tag}!`);
 });
 
-app.post(
-  "/interactions",
-  verifyKeyMiddleware(process.env["TOKEN"]),
-  (req, res) => {
-    const message = req.body;
-
-    if (type === InteractionType.PING) {
-      return res.send({ type: InteractionResponseType.PONG });
+client.on(Events.InteractionCreate, async (interaction) => {
+  if (!interaction.isChatInputCommand()) return;
+  try {
+    const command = interaction.client.commands.get(interaction.commandName);
+    if (!command) {
+      throw { mensange: "Comando não configurado" };
     }
-
-    if (message.type === InteractionType.APPLICATION_COMMAND) {
-      res.send({
-        type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-        data: {
-          content: "Hello world",
-        },
-      });
-    }
+    await command.execute(interaction);
+  } catch (error) {
+    await interaction.reply({
+      content: error.mensange,
+      ephemeral: true,
+    });
   }
-);
+});
+
+client.login(process.env.TOKEN);
