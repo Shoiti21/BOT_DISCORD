@@ -5,7 +5,7 @@
   "main": "index.js",
   "type": "module",
   "scripts": {
-    "vercel-build": "node index.js",
+    "vercel-build": "yarn && node index.js",
     "start": "node index.js",
     "dev": "nodemon index.js"
   },
