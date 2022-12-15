@@ -1,9 +1,20 @@
 import * as dotenv from "dotenv";
+import express from "express";
 import { Client, Collection, Events, GatewayIntentBits } from "discord.js";
 import commands from "./commands.js";
 import { Player } from "discord-player";
 
 dotenv.config();
+
+const app = express();
+
+app.get("/", (req, res) => {
+  res.send("Ping!");
+});
+
+app.listen(8080, () => {
+  console.log(`Ouvindo na porta 8080`);
+});
 
 const client = new Client({
   intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildVoiceStates],
